@@ -34,6 +34,8 @@ export function TableView({ state, dispatch, deck, header, top, tools, onRoll, o
   const permanents = battlefield.filter((c) => !isLand(c.card))
   const handWidth = useMemo(() => Math.min(compact ? 78 : 96, Math.max(54, 680 / Math.max(1, hand.length))), [hand.length, compact])
   const log = (t: string) => onAction?.(t)
+  const commanderIds = useMemo(() => new Set(deck.cards.filter((c) => c.commander).map((c) => c.card.id)), [deck])
+  const tax = (state.cmdCasts ?? 0) * 2
 
   const dice = (label: string, fn: () => string) => {
     const value = fn()
@@ -74,7 +76,14 @@ export function TableView({ state, dispatch, deck, header, top, tools, onRoll, o
             <ZoneRow label="Lands" cards={lands} onCard={onCard} small compact={compact} />
           </div>
           <div className={cx('flex flex-col gap-2 md:gap-3 shrink-0', compact ? 'w-12 md:w-20' : 'w-16 md:w-24')}>
-            {deck.commander && <Pile label="Command" icon={<Crown size={11} />} cards={zoneOf(state, 'command')} onOpen={() => setPile('command')} />}
+            {deck.commander && (
+              <CommandSlot
+                commander={deck.commander}
+                inZone={zoneOf(state, 'command')[0]}
+                tax={tax}
+                onOpen={(c) => (c && phase === 'play' ? setMenu(c) : setPile('command'))}
+              />
+            )}
             <Pile
               label="Library"
               cards={library}
@@ -210,6 +219,11 @@ export function TableView({ state, dispatch, deck, header, top, tools, onRoll, o
           <div className="flex gap-4">
             <CardImage card={menu.card} className="w-36 shrink-0" />
             <div className="flex-1 grid gap-2 content-start">
+              {menu.zone === 'command' && (
+                <p className="text-xs text-gold">
+                  Commander tax: {tax ? `+${tax} mana` : 'none yet'}. Casting it from here adds +2 next time.
+                </p>
+              )}
               {(
                 [
                   ['battlefield', 'Play to battlefield'],
@@ -217,6 +231,7 @@ export function TableView({ state, dispatch, deck, header, top, tools, onRoll, o
                   ['exile', 'Exile'],
                   ['hand', 'Hand'],
                   ['library', 'Top of library'],
+                  ...(commanderIds.has(menu.card.id) ? [['command', 'Command zone'] as [Zone, string]] : []),
                 ] as [Zone, string][]
               )
                 .filter(([z]) => z !== menu.zone)
@@ -285,6 +300,21 @@ function ZoneRow({ label, cards, onCard, small, empty, compact }: { label: strin
         ))}
       </div>
     </div>
+  )
+}
+
+/** The command zone, always visible: the commander with a gold frame and the current tax. */
+function CommandSlot({ commander, inZone, tax, onOpen }: { commander: Deck['commander'] & object; inZone?: Inst; tax: number; onOpen: (c?: Inst) => void }) {
+  return (
+    <button onClick={() => onOpen(inZone)} className="text-left group" title={inZone ? 'Tap to cast your commander' : 'Your commander is not in the command zone'}>
+      <div className={cx('card-img relative ring-2', inZone ? 'ring-gold shadow-[0_0_16px_-4px_rgb(231,198,127)]' : 'ring-white/10 opacity-40')}>
+        <CardImage card={commander} small className="absolute inset-0" />
+        {tax > 0 && <span className="absolute bottom-1 inset-x-1 text-center text-[9px] font-semibold rounded bg-black/80 text-gold">+{tax}</span>}
+      </div>
+      <div className="flex items-center gap-1 text-[10px] md:text-[11px] text-gold mt-1 truncate">
+        <Crown size={11} className="shrink-0" /> {inZone ? 'Cmdr' : 'In play'}
+      </div>
+    </button>
   )
 }
 

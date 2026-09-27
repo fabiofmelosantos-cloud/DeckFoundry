@@ -2,7 +2,7 @@ import { useEffect, useReducer, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { Bot, ChevronLeft, Heart, Minus, Plus, RotateCcw, Users } from 'lucide-react'
 import { useDiscovery } from '../lib/discovery'
-import { emptyTable, tableReducer } from '../lib/table'
+import { emptyTable, isCommanderDeck, tableReducer } from '../lib/table'
 import { TableView, Tool } from '../components/TableView'
 import { cx } from '../components/ui'
 
@@ -10,7 +10,7 @@ export default function TestDeck() {
   const { id } = useParams()
   const disc = useDiscovery()
   const deck = disc.byId.get(id ?? '')?.deck
-  const startLife = deck?.commander ? 40 : 20
+  const startLife = deck && isCommanderDeck(deck) ? 40 : 20
   const [state, dispatch] = useReducer(tableReducer, emptyTable(startLife))
   const [turn, setTurn] = useState(1)
   const [oppLife, setOppLife] = useState(startLife)

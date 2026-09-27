@@ -35,7 +35,7 @@ async function main() {
   for (const [name, c] of cards) {
     if (c.prices.eur != null) continue
     try {
-      const q = encodeURIComponent(`!"${name}" -is:promo game:paper`)
+      const q = encodeURIComponent(`!"${name}" -is:promo game:paper lang:en is:booster`)
       const prints = (await api(`/cards/search?q=${q}&unique=prints&order=eur&dir=asc`)).data
       const alt = compact(prints.find((p) => p.prices?.eur || p.prices?.usd) ?? prints[0])
       if (alt.prices.eur != null) cards.set(name, alt)

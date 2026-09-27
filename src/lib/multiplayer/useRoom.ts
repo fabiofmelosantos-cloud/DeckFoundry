@@ -41,6 +41,7 @@ function snapshot(id: string, s: TableState): PublicState {
     hand: zoneOf(s, 'hand').length,
     library: zoneOf(s, 'library').length,
     mulligans: s.mulligans,
+    cmdTax: (s.cmdCasts ?? 0) * 2,
     phase: s.phase,
     battlefield: z('battlefield'),
     graveyard: z('graveyard'),
@@ -78,7 +79,7 @@ export interface RoomOptions {
   code: string
   name: string
   deck: Deck | undefined
-  create?: { size: 2 | 4; life: number } // set when this player created the room
+  create?: { size: 2 | 4; life: number; format?: 'commander' | 'constructed' } // set when this player created the room
 }
 
 export function useRoom({ code, name, deck, create }: RoomOptions) {
@@ -105,7 +106,9 @@ export function useRoom({ code, name, deck, create }: RoomOptions) {
   const ref = useRef({ table, game, score, deck, players, startLife: 20 })
 
   const me: PresenceInfo = useMemo(
-    () => ({ id: myId, name, deckName: deck?.name ?? '', colors: deck?.colors ?? [], ready: ready && !!deck, host: !!create, joinedAt, ...(create ? { size: create.size, life: create.life } : {}) }),
+    () => ({ id: myId, name, deckName: deck?.name ?? '', colors: deck?.colors ?? [], ready: ready && !!deck, host: !!create, joinedAt,
+      ...(deck?.commander ? { commander: { name: deck.commander.name, image: deck.commander.imageSmall ?? deck.commander.image } } : {}),
+      ...(create ? { size: create.size, life: create.life, format: create.format ?? (create.life >= 40 ? 'commander' : 'constructed') } : {}) }),
     [myId, name, deck, ready, create, joinedAt],
   )
 
@@ -117,6 +120,7 @@ export function useRoom({ code, name, deck, create }: RoomOptions) {
   const hostInfo = seated.find((p) => p.host) ?? seated[0]
   const size = hostInfo?.size ?? 2
   const startLife = hostInfo?.life ?? 20
+  const format: 'commander' | 'constructed' = hostInfo?.format ?? (startLife >= 40 ? 'commander' : 'constructed')
   const iAmHost = hostInfo?.id === myId
   ref.current = { table, game, score, deck, players, startLife }
   const mySeat = seated.findIndex((p) => p.id === myId)
@@ -306,6 +310,7 @@ export function useRoom({ code, name, deck, create }: RoomOptions) {
     players: seated,
     size,
     startLife,
+    format,
     iAmHost,
     full,
     game,

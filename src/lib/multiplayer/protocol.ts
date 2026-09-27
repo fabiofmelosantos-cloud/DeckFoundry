@@ -11,9 +11,11 @@ export interface PresenceInfo {
   ready: boolean
   host: boolean
   joinedAt: number
+  commander?: { name: string; image: string | null }
   // Room settings travel with the host's presence
   size?: 2 | 4
   life?: number
+  format?: 'commander' | 'constructed'
 }
 
 /** A card as others see it on the table. */
@@ -33,6 +35,7 @@ export interface PublicState {
   hand: number
   library: number
   mulligans: number
+  cmdTax?: number
   phase: 'opening' | 'bottom' | 'play'
   battlefield: PubCard[]
   graveyard: PubCard[]

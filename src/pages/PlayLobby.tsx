@@ -1,11 +1,12 @@
 import { useMemo, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { ArrowRight, Bot, Info, Plus, Users } from 'lucide-react'
+import { ArrowRight, Bot, Crown, Info, Plus, Users } from 'lucide-react'
+import { commanderOptions, isCommanderDeck } from '../lib/table'
 import { useDiscovery } from '../lib/discovery'
 import { setPrefs, useStore } from '../lib/store'
 import { newRoomCode } from '../lib/multiplayer/useRoom'
 import { onlineAvailable } from '../lib/multiplayer/transport'
-import { ManaPips, PageHeader, cx } from '../components/ui'
+import { CardImage, ManaPips, PageHeader, cx } from '../components/ui'
 
 export default function PlayLobby() {
   const nav = useNavigate()
@@ -16,13 +17,19 @@ export default function PlayLobby() {
   const [deckId, setDeckId] = useState(params.get('deck') ?? decks[0]?.deck.id ?? '')
   const deck = decks.find((a) => a.deck.id === deckId)?.deck
   const [size, setSize] = useState<2 | 4>(2)
-  const [code, setCode] = useState('')
-  const life = deck?.commander ? 40 : 20
+  const [code, setCode] = useState((params.get('room') ?? '').toUpperCase())
+  const commanderFormat = !!deck && isCommanderDeck(deck)
+  const options = useMemo(() => (deck && commanderFormat && !deck.commander ? commanderOptions(deck) : []), [deck, commanderFormat])
+  const [cmdPick, setCmdPick] = useState('')
+  const cmdId = deck?.commander?.id ?? (options.some((o) => o.id === cmdPick) ? cmdPick : '')
+  const needsCommander = commanderFormat && !cmdId
+  const life = commanderFormat ? 40 : 20
+  const q = () => `?deck=${deckId}${cmdId && !deck?.commander ? `&cmd=${cmdId}` : ''}`
 
   const create = () => {
     const c = newRoomCode()
-    sessionStorage.setItem(`deckfoundry:create:${c}`, JSON.stringify({ size, life }))
-    nav(`/play/${c}?deck=${deckId}`)
+    sessionStorage.setItem(`deckfoundry:create:${c}`, JSON.stringify({ size, life, format: commanderFormat ? 'commander' : 'constructed' }))
+    nav(`/play/${c}${q()}`)
   }
 
   return (
@@ -53,7 +60,7 @@ export default function PlayLobby() {
                   <div className="flex-1 min-w-0">
                     <div className="text-sm font-medium truncate">{a.deck.name}</div>
                     <div className="text-xs text-fg-3">
-                      {a.deck.commander ? 'Commander' : `${a.total} cards`} · {a.pct}% owned
+                      {isCommanderDeck(a.deck) ? 'Commander' : 'Constructed'} · {a.total} cards · {a.pct}% owned
                     </div>
                   </div>
                 </button>
@@ -64,6 +71,33 @@ export default function PlayLobby() {
               return a.pct < 100 ? <p className="text-xs text-fg-3 mt-2">You own {a.owned}/{a.total} — the rest plays as proxies.</p> : null
             })()}
           </div>
+          {deck && commanderFormat && (
+            <div>
+              <div className="eyebrow mb-2 flex items-center gap-1.5">
+                <Crown size={12} className="text-gold" /> Commander
+              </div>
+              {deck.commander ? (
+                <div className="flex items-center gap-3">
+                  <CardImage card={deck.commander} small className="w-12" />
+                  <span className="text-sm">{deck.commander.name}</span>
+                </div>
+              ) : options.length ? (
+                <>
+                  <p className="text-xs text-fg-3 mb-2">This is a 100-card deck, so you'll play Commander at 40 life. Which card is your commander?</p>
+                  <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
+                    {options.map((c) => (
+                      <button key={c.id} onClick={() => setCmdPick(c.id)} className={cx('w-20 shrink-0 text-left', cmdPick === c.id ? '' : 'opacity-60 hover:opacity-100')}>
+                        <CardImage card={c} small className={cx(cmdPick === c.id && 'ring-2 ring-gold')} />
+                        <div className="text-[10px] mt-1 truncate">{c.name.split(',')[0]}</div>
+                      </button>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <p className="text-xs text-need">No legendary creature in this list — add one to play it as Commander.</p>
+              )}
+            </div>
+          )}
         </div>
 
         {deck && (
@@ -92,8 +126,8 @@ export default function PlayLobby() {
                 </button>
               ))}
             </div>
-            <p className="text-xs text-fg-3 mb-4">Starting life {life}{deck?.commander ? ' (Commander)' : ''}.</p>
-            <button className="btn btn-primary w-full" disabled={!deck} onClick={create}>
+            <p className="text-xs text-fg-3 mb-4">{commanderFormat ? 'Commander' : 'Constructed'} · starting life {life}.</p>
+            <button className="btn btn-primary w-full" disabled={!deck || needsCommander} onClick={create}>
               Create room <ArrowRight size={16} />
             </button>
           </div>
@@ -109,7 +143,7 @@ export default function PlayLobby() {
               value={code}
               onChange={(e) => setCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))}
             />
-            <button className="btn btn-ghost w-full" disabled={code.length !== 5 || !deck} onClick={() => nav(`/play/${code}?deck=${deckId}`)}>
+            <button className="btn btn-ghost w-full" disabled={code.length !== 5 || !deck || needsCommander} onClick={() => nav(`/play/${code}${q()}`)}>
               Join
             </button>
           </div>

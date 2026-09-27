@@ -4,6 +4,7 @@ import QRCode from 'qrcode'
 import { Check, ChevronLeft, Copy, Crown, Flag, Hand, Heart, Layers, Loader2, Minus, Mountain, Plus, ScrollText, Skull, Trophy, Wifi, WifiOff } from 'lucide-react'
 import type { Deck } from '../lib/types'
 import { useDiscovery } from '../lib/discovery'
+import { isCommanderDeck, withCommander } from '../lib/table'
 import { useStore } from '../lib/store'
 import { useRoom, type Room } from '../lib/multiplayer/useRoom'
 import type { PresenceInfo, PubCard, PublicState } from '../lib/multiplayer/protocol'
@@ -15,7 +16,10 @@ export default function PlayRoom() {
   const [params] = useSearchParams()
   const disc = useDiscovery()
   const name = useStore((s) => s.prefs.username)
-  const deck = disc.byId.get(params.get('deck') ?? '')?.deck
+  const base = disc.byId.get(params.get('deck') ?? '')?.deck
+  const cmd = params.get('cmd')
+  // A commander picked in the lobby for a 100-card list that didn't mark one
+  const deck = useMemo(() => (base && cmd && !base.commander ? withCommander(base, cmd) : base), [base, cmd])
   const create = useMemo(() => {
     try {
       return JSON.parse(sessionStorage.getItem(`deckfoundry:create:${code}`) ?? 'null') ?? undefined
@@ -28,15 +32,24 @@ export default function PlayRoom() {
     return (
       <div className="max-w-md mx-auto text-center py-16">
         <p className="text-fg-2 mb-4">Pick a deck to join room {code}.</p>
-        <Link to={`/play`} className="btn btn-primary">
+        <Link to={`/play?room=${code}`} className="btn btn-primary">
           Choose a deck
+        </Link>
+      </div>
+    )
+  if (isCommanderDeck(deck) && !deck.commander)
+    return (
+      <div className="max-w-md mx-auto text-center py-16">
+        <p className="text-fg-2 mb-4">{deck.name} has 100 cards — choose its commander before joining room {code}.</p>
+        <Link to={`/play?room=${code}&deck=${deck.id}`} className="btn btn-primary">
+          Choose commander
         </Link>
       </div>
     )
   return <RoomScreen code={code} name={name} deck={deck} create={create} />
 }
 
-function RoomScreen({ code, name, deck, create }: { code: string; name: string; deck: Deck; create?: { size: 2 | 4; life: number } }) {
+function RoomScreen({ code, name, deck, create }: { code: string; name: string; deck: Deck; create?: { size: 2 | 4; life: number; format?: 'commander' | 'constructed' } }) {
   const room = useRoom({ code, name, deck, create })
   const inGame = !!room.game && room.game.order.includes(room.myId)
 
@@ -73,7 +86,7 @@ function WaitingRoom({ room, code, deckName }: { room: Room; code: string; deckN
   return (
     <div className="max-w-4xl">
       <PageHeader
-        eyebrow={`Room · ${room.size} players`}
+        eyebrow={`${room.format === 'commander' ? 'Commander' : 'Constructed'} · ${room.size} players · ${room.startLife} life`}
         title={
           <span className="font-mono tracking-[0.2em]">
             {code}
@@ -99,6 +112,11 @@ function WaitingRoom({ room, code, deckName }: { room: Room; code: string; deckN
                       </div>
                       <div className="text-xs text-fg-3 flex items-center gap-1.5 truncate">
                         <ManaPips colors={p.colors} size={11} /> {p.deckName || 'choosing a deck…'}
+                        {p.commander && (
+                          <span className="inline-flex items-center gap-1 text-gold ml-1">
+                            <Crown size={10} /> {p.commander.name.split(',')[0]}
+                          </span>
+                        )}
                       </div>
                     </div>
                     {room.score[p.id] ? <span className="text-xs text-gold num">{room.score[p.id]} win{room.score[p.id] > 1 ? 's' : ''}</span> : null}
@@ -177,7 +195,7 @@ function Game({ room, code, deck }: { room: Room; code: string; deck: Deck }) {
         <div className="min-w-0 flex-1">
           <div className={cx('text-sm font-semibold truncate', myTurn && 'text-gold')}>{g.winner ? 'Game over' : myTurn ? 'Your turn' : `${room.nameOf(g.active)}'s turn`}</div>
           <div className="text-[11px] text-fg-3 truncate num">
-            <span className="font-mono">{code}</span> · Game {g.no} · Turn {g.turn} · {scoreLine}
+            <span className="font-mono">{code}</span> · {room.format === 'commander' ? 'Commander' : 'Constructed'} · Game {g.no} · Turn {g.turn} · {scoreLine}
           </div>
         </div>
         <button className="w-9 h-9 rounded-full hover:bg-white/5 flex items-center justify-center text-fg-2" onClick={() => setLogOpen(true)} aria-label="Game log">
@@ -301,6 +319,12 @@ function OpponentPanel({ id, info, s, active, out, compact, onOpen }: { id: stri
   return (
     <button onClick={onOpen} className={cx('w-full text-left rounded-2xl border p-2.5 md:p-3 transition-colors bg-ink-850/80', active ? 'border-gold/50 shadow-[0_0_20px_-6px_rgb(231,198,127)]' : 'border-white/[.07]', out && 'opacity-40')} data-player={id}>
       <div className="flex items-center gap-2">
+        {info?.commander?.image && (
+          <div className="relative shrink-0" title={`Commander: ${info.commander.name}${s?.cmdTax ? ` (tax +${s.cmdTax})` : ''}`}>
+            <img src={info.commander.image} alt={info.commander.name} className={cx('rounded-[4px] ring-1 ring-gold/60 object-cover', compact ? 'w-6 h-8' : 'w-8 h-11')} />
+            {!!s?.cmdTax && <span className="absolute -bottom-1 -right-1 text-[8px] font-bold px-0.5 rounded bg-black text-gold">+{s.cmdTax}</span>}
+          </div>
+        )}
         <div className="min-w-0 flex-1">
           <div className="text-xs md:text-sm font-semibold truncate flex items-center gap-1">
             {out && <Skull size={11} className="text-need" />}
