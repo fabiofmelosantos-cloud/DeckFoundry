@@ -88,11 +88,12 @@ body {
     color: var(--color-fg-3);
     font-weight: 500;
   }
+  /* Headlines: clean sans, tight tracking. Emphasis comes from weight and colour, not italics. */
   .display {
-    font-family: var(--font-serif);
-    font-weight: 400;
-    letter-spacing: -0.01em;
-    line-height: 1.02;
+    font-family: var(--font-sans);
+    font-weight: 600;
+    letter-spacing: -0.035em;
+    line-height: 1.05;
   }
   .num {
     font-variant-numeric: tabular-nums;
@@ -193,6 +194,12 @@ body {
   .no-scrollbar {
     scrollbar-width: none;
   }
+}
+
+/* Outside the layers so it beats Tailwind's .italic utility inside headlines */
+.display .italic {
+  font-style: normal;
+  font-weight: 400;
 }
 
 @keyframes shimmer {
