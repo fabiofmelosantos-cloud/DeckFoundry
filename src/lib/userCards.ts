@@ -118,3 +118,35 @@ export async function resolveOnline(ids: Identifier[], onProgress?: (done: numbe
   await saveUserCards(fresh)
   return out
 }
+
+// ---- polite Scryfall access for interactive features (scanner) -----------------------------------
+// One request at a time, ~100ms apart; a 429 (rate limit) waits and retries. The browser
+// reports Scryfall's 429 as a network error because it carries no CORS headers, so any
+// failed fetch is treated the same way.
+let queue: Promise<unknown> = Promise.resolve()
+export function scryfallGet<T = any>(path: string): Promise<T | null> {
+  const run = async (): Promise<T | null> => {
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const r = await fetch('https://api.scryfall.com' + path, { headers: { Accept: 'application/json' } })
+        await new Promise((res) => setTimeout(res, 100))
+        if (r.status === 429) throw new Error('rate limited')
+        return r.ok ? ((await r.json()) as T) : null
+      } catch {
+        await new Promise((res) => setTimeout(res, 800 * (attempt + 1)))
+      }
+    }
+    return null
+  }
+  const p = queue.then(run, run)
+  queue = p.catch(() => {})
+  return p
+}
+
+/** Keeps full Scryfall card objects we already fetched (no second request) and returns them as Cards. */
+export function adoptScryfall(json: any[]): Card[] {
+  const cards = json.map(compact)
+  registerUserCards(cards)
+  void saveUserCards(cards)
+  return cards
+}

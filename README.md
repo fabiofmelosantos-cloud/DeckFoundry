@@ -25,7 +25,7 @@ Demo data is generated on first load and stored in `localStorage`. **Profile →
 | Dashboard | `/` | Collection / value / decks ready / discoveries, hero discovery with "Why this deck?" |
 | Import | `/import` | MTG Arena deck exports, ManaBox, Moxfield, Deckbox, Archidekt, TCGplayer, Dragon Shield, any CSV or text list. Replace the demo collection or add to it; optionally save the list as a deck |
 | Collection | `/collection` | Search, colour chips, filters (type, rarity, mana value, price, quantity, format, Commander legality, foil, set, acquisition date), grid/list, manual add |
-| Scanner | `/scan` | Scan → detect → review/correct → confirm → "here's what you can build" |
+| Scanner | `/scan` | Real on-device scanner: hold a card in the frame; the collector line (set code + number + language) gives the exact printing and the title confirms it. Older cards are matched by name, then you pick the edition. Also reads photos |
 | Discover | `/discover` | For you / Meta / Kitchen Table / Lab / Commander, Surprise Me, "Build from my collection" prompt |
 | Deck view | `/deck/:id` | Readiness, **strategy guide** (game plan by phase, mulligan with exact odds, play tips, matchups, card roles — for every deck, AI-built and imported too), why this deck, curve, types, combos, "You're N cards away", best upgrades, decklist with own/need status, export, improve, save |
 | Play with friends | `/play`, `/play/:code` | Online rooms for 2 or 4 players: code, link or QR; seats and ready check; random first player; turn passing; life, poison and commander damage; shared game log and dice; several games per room with a running score |
@@ -106,7 +106,7 @@ Momentum comes from Cardmarket's 30-day average vs its current trend. Once our o
 
 ## Honest limitations of this MVP
 
-- **Scanner recognition is simulated.** The camera, detection overlay, confidence scores, correction flow and confirmation are all real UI, but the detected cards are drawn from the database. Real recognition means replacing the progressive detection loop in `src/pages/Scanner.tsx` with a model or OCR service.
+- **Scanner scope:** it reads one card at a time. It's exact for cards printed since 2014, which have a set code and number in the bottom-left corner; older cards are matched by name and you choose the edition. Card names in non-Latin scripts rely on the collector line alone. Heavy foil glare on the bottom-left corner can defeat it. Lookups go to Scryfall; the OCR itself runs on the phone (Tesseract, engine and model cached after first use). Debug: set `localStorage['deckfoundry:scanDebug'] = '1'` to log raw OCR in `window.__scanLog`.
 - **The "AI" builder is a local rules engine.** It uses synergy scoring, role quotas (ramp, draw, removal, wipes), mana-base selection, legality and budget checks, and generates its explanations from that data. `parsePrompt` in `builder.ts` is the natural-language layer, and an LLM can replace it as long as it returns a `BuildRequest`. That keeps the "only real cards" guarantee in the builder.
 - **Longer price history** builds up from weekly `npm run fetch-market` runs. Cardmarket's public file only covers 30 days, and its full API needs an approved account.
 - **Arena collections:** Arena exports decks, not your full collection. Collection trackers that read Arena usually export CSV, which the importer accepts.
